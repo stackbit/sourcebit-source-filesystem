@@ -1,0 +1,34 @@
+{
+  "name": "sourcebit-source-filesystem",
+  "version": "0.1.0",
+  "description": "Sourcebit filesystem source plugin",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "version-minor": "npm version minor -m \"bumped version to v%s\"",
+    "version-patch": "npm version patch -m \"bumped version to v%s\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stackbithq/sourcebit-source-filesystem.git"
+  },
+  "keywords": [
+    "sourcebit",
+    "jamstack",
+    "filesystem",
+    "stackbit"
+  ],
+  "author": "Stackbit Inc.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/stackbithq/sourcebit-source-filesystem/issues"
+  },
+  "homepage": "https://github.com/stackbithq/sourcebit-source-filesystem#readme",
+  "dependencies": {
+    "@stackbit/schema": "^0.1.1",
+    "@stackbit/utils": "^0.1.0",
+    "chokidar": "^3.4.0",
+    "fs-extra": "^9.0.1",
+    "lodash": "^4.17.15"
+  }
+}
