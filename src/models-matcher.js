@@ -105,7 +105,7 @@ function addMetadata(data, model, { filePath, modelsByName, dataFieldPath = [], 
                     modelType: model.type,
                     modelName: _.get(model, 'name', null),
                     modelLabel: _.get(model, 'label', null),
-                    url: model.type === 'page' ? urlFromFilePath(filePath) : null
+                    urlPath: model.type === 'page' ? urlPathFromFilePath(filePath) : null
                 }, _.isNil)
             )
         }
@@ -163,14 +163,14 @@ function mapObjectField(fieldValue, fieldModel, { filePath, modelsByName, dataFi
     }
 }
 
-function urlFromFilePath(filePath) {
+function urlPathFromFilePath(filePath) {
     const pathObject = path.parse(filePath);
     const parts = _.compact(pathObject.dir.split(path.sep));
     if (pathObject.name !== 'index') {
         parts.push(pathObject.name);
     }
-    const url = parts.join('/').toLowerCase();
-    return  '/' + url + (url ? '/' : '');
+    const urlPath = parts.join('/').toLowerCase();
+    return  '/' + urlPath + (urlPath ? '/' : '');
 }
 
 function mergeDataObjects(objects, objectFileKeyPath, source) {

@@ -93,7 +93,9 @@ module.exports.transform = ({ data, getPluginContext, options }) => {
             logMatchedModels: _.get(options, 'logMatchedModels', false)
         });
     }
-    return _.assign({}, data, { objects });
+    return _.assign({}, data, {
+        objects: data.objects.concat(objects)
+    });
 };
 
 async function loadStackbitYaml(stackbitYamlPath) {
