@@ -170,7 +170,7 @@ function urlPathFromFilePath(filePath) {
         parts.push(pathObject.name);
     }
     const urlPath = parts.join('/').toLowerCase();
-    return  '/' + urlPath + (urlPath ? '/' : '');
+    return  '/' + urlPath;
 }
 
 function mergeDataObjects(objects, objectFileKeyPath, source) {
