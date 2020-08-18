@@ -31,6 +31,7 @@ module.exports.bootstrap = async ({ setPluginContext, options, refresh }) => {
     const stackbitYamlPath = path.resolve(stackbitYamlFileName);
     const stackbitYamlExists = await fse.pathExists(stackbitYamlPath);
     if (stackbitYamlExists) {
+        log('loading stackbit.yaml and models...');
         const { models, stackbitYaml } = await loadStackbitYaml(stackbitYamlPath)
         setPluginContext({ models, stackbitYaml });
 
@@ -52,18 +53,36 @@ module.exports.bootstrap = async ({ setPluginContext, options, refresh }) => {
     setPluginContext({ files });
 
     if (watch) {
-        const update = async (eventName, path) => {
-            log(`file '${path}' has been ${eventName}, reloading files...`);
+        let changedFilePaths = [];
 
-            if (path === stackbitYamlFileName) {
-                const { models, stackbitYaml } = loadStackbitYaml(stackbitYamlPath)
+        // don't call refresh on every file change, as multiple files could be written at once.
+        // instead, debounce the update function for 50ms, up to 200ms
+        const debouncedUpdate = _.debounce(async () => {
+            log(`reload files and refresh sourcebit plugins...`);
+
+            const filePathsCopy = changedFilePaths.slice();
+            changedFilePaths = [];
+
+            if (filePathsCopy.includes(stackbitYamlFileName)) {
+                log('reloading stackbit.yaml and models...');
+                const { models, stackbitYaml } = await loadStackbitYaml(stackbitYamlPath)
                 setPluginContext({ models, stackbitYaml });
-            } else {
+            }
+
+            if (_.some(filePathsCopy, filePath => filePath !== stackbitYamlFileName)) {
+                log('reloading content files...');
                 const files = await readFiles(sources);
+                log(`loaded ${files.length} files`);
                 setPluginContext({ files });
             }
 
             refresh();
+        }, 50, {maxWait: 200});
+
+        const update = async (eventName, filePath) => {
+            log(`file '${filePath}' has been ${eventName}, reloading files...`);
+            changedFilePaths.push(filePath);
+            await debouncedUpdate();
         };
 
         const watchPaths = _.map(sources, _.property('path'));
