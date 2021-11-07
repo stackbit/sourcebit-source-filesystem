@@ -1,58 +1,60 @@
 const path = require('path');
 const _ = require('lodash');
-const { getModelByQuery } = require('@stackbit/schema');
+const { getModelByQuery } = require('@stackbit/sdk');
 
 
 module.exports = {
     matchObjectsToModels
 };
 
+function log(message) {
+    console.log(`[sourcebit-source-filesystem] ${message}`);
+}
+
+function logError(message) {
+    console.error(`[sourcebit-source-filesystem] ${message}`);
+}
+
 function matchObjectsToModels(objects, models, { pageObjectsPredicate, dataObjectsPredicate, pageLayoutKey, dataTypeKey, objectIdKeyPath, objectFileKeyPath, source, mergeDataModels, logMatchedModels }) {
     const modelsByName = _.keyBy(models, 'name');
     const pageModels = _.filter(models, _.matches({'type': 'page'}));
     const dataModels = _.filter(models, _.matches({'type': 'data'}));
 
-    console.log('matching files to models...');
+    log('matching files to models...');
     const modelsByObjectIds = _.reduce(objects, (accum, object) => {
         if (pageObjectsPredicate(object)) {
-            // return matchPageModel(object, pageModels, modelsByName);
-            let model;
-            try {
-                model = getModelByQuery({
-                    filePath: _.get(object, objectFileKeyPath),
-                    type: _.get(object, pageLayoutKey),
-                    modelTypeKeyPath: 'layout'
-                }, pageModels);
-            } catch (err) {
-                console.error(err.message);
-                return accum;
+            const { model, error } = getModelByQuery({
+                filePath: _.get(object, objectFileKeyPath),
+                type: _.get(object, pageLayoutKey),
+                modelTypeKeyPath: 'layout'
+            }, pageModels);
+            if (error) {
+                logError(error.message);
+            } else {
+                const objectId = _.get(object, objectIdKeyPath);
+                accum[objectId] = model;
             }
-            const objectId = _.get(object, objectIdKeyPath);
-            accum[objectId] = model;
         } else if (dataObjectsPredicate(object)) {
-            // return matchDataModel(object, dataModelsByFilePath, modelsByName);
-            let model;
-            try {
-                model = getModelByQuery({
-                    filePath: _.get(object, objectFileKeyPath),
-                    type: _.get(object, dataTypeKey),
-                    modelTypeKeyPath: 'name'
-                }, dataModels);
-            } catch (err) {
-                console.error(err.message);
-                return accum;
+            const { model, error } = getModelByQuery({
+                filePath: _.get(object, objectFileKeyPath),
+                type: _.get(object, dataTypeKey),
+                modelTypeKeyPath: 'name'
+            }, dataModels);
+            if (error) {
+                logError(error.message);
+            } else {
+                const objectId = _.get(object, objectIdKeyPath);
+                accum[objectId] = model;
             }
-            const objectId = _.get(object, objectIdKeyPath);
-            accum[objectId] = model;
         }
         return accum;
     }, {});
 
-    console.log(`${_.size(modelsByObjectIds)} of ${_.size(objects)} files were matched to models`);
+    log(`${_.size(modelsByObjectIds)} of ${_.size(objects)} files were matched to models`);
     if (logMatchedModels) {
         const modelNames = _.uniq(_.map(modelsByObjectIds, 'name'));
         const longestModelName = _.maxBy(modelNames, _.size);
-        console.log('matched models:' + _.map(modelsByObjectIds, (model, objectId) => '\n  ' + _.padEnd(model.name, longestModelName.length) + ' : ' + objectId).join(''));
+        log('matched models:' + _.map(modelsByObjectIds, (model, objectId) => '\n  ' + _.padEnd(model.name, longestModelName.length) + ' : ' + objectId).join(''));
     }
 
     objects = _.map(objects, object => {
@@ -80,7 +82,7 @@ function addMetadata(data, model, { filePath, modelsByName, dataFieldPath = [], 
     }
     const location = `file: ${filePath}:${dataFieldPath.join('.')}, model: stackbit.yaml:models.${modelFieldPath.join('.')}`;
     if (!_.isPlainObject(data)) {
-        console.error(`value must be an object, ${location}`);
+        logError(`value must be an object, ${location}`);
         return data;
     }
     data = _.mapValues(data, (fieldValue, fieldName) => {
@@ -118,24 +120,24 @@ function mapObjectField(fieldValue, fieldModel, { filePath, modelsByName, dataFi
         return addMetadata(fieldValue, fieldModel, { filePath, modelsByName, dataFieldPath, modelFieldPath });
     } else if (fieldModel.type === 'model') {
         if (!_.has(fieldModel, 'models') || !_.isArray(fieldModel.models) || fieldModel.models.length < 1) {
-            console.error(`field of type 'model' must have 'models' property having an array with at least one model name, ${location}`);
+            logError(`field of type 'model' must have 'models' property with array having at least one model name, ${location}`);
             return fieldValue;
         }
         let modelName;
         if (fieldModel.models.length === 1) {
             modelName = _.head(fieldModel.models);
             if (!_.has(modelsByName, modelName)) {
-                console.error(`the values of the 'models' array of the field of type 'model' must be the names of existing models, ${location}`);
+                logError(`the 'models' array of the field of type 'model' must include the names of existing models, ${location}`);
                 return fieldValue;
             }
         } else {
             if (!_.has(fieldValue, 'type')) {
-                console.error(`object referenced by a field of type 'model' having more than one model in 'models' array, must have 'type' property specifying the name of the object's model, ${location}`);
+                logError(`object referenced by a field of type 'model' having more than one model in 'models' array, must have 'type' property specifying the name of the object's model, ${location}`);
                 return fieldValue;
             }
             modelName = fieldValue.type;
             if (!_.has(modelsByName, modelName)) {
-                console.error(`the value of the 'type' property of the object referenced by a field of type 'model' must be the name of an existing model, ${location}`);
+                logError(`the value of the 'type' property of the object referenced by a field of type 'model' must be the name of an existing model, ${location}`);
                 return fieldValue;
             }
         }
@@ -149,7 +151,7 @@ function mapObjectField(fieldValue, fieldModel, { filePath, modelsByName, dataFi
         return fieldValue;
     } else if (fieldModel.type === 'list') {
         if (!_.isArray(fieldValue)) {
-            console.error(`the value referenced by a field of type 'list' must be an array, ${location}`);
+            logError(`the value referenced by a field of type 'list' must be an array, ${location}`);
             return fieldValue;
         }
         // default items.type of a list is 'string'

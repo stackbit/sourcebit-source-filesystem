@@ -2,7 +2,7 @@ const chokidar = require('chokidar');
 const fse = require('fs-extra');
 const path = require('path');
 const _ = require('lodash');
-const { loadModels } = require('@stackbit/schema');
+const { loadConfig } = require('@stackbit/sdk');
 const { parseFile, mapPromise, readDirRecursively } = require('@stackbit/utils');
 const { matchObjectsToModels } = require('./models-matcher');
 
@@ -32,13 +32,13 @@ module.exports.bootstrap = async ({ setPluginContext, options, refresh }) => {
     const stackbitYamlExists = await fse.pathExists(stackbitYamlPath);
     if (stackbitYamlExists) {
         log('loading stackbit.yaml and models...');
-        const { models, stackbitYaml } = await loadStackbitYaml(stackbitYamlPath)
-        setPluginContext({ models, stackbitYaml });
+        const config = await loadStackbitYaml();
+        setPluginContext({ config });
 
         // if 'sources' were not specified, use 'pagesDir' and 'dataDir' from stackbit.yaml
         if (_.isEmpty(sources)) {
-            const pagesDir = _.get(stackbitYaml, 'pagesDir', '');
-            const dataDir = _.get(stackbitYaml, 'dataDir', '');
+            const pagesDir = _.get(config, 'pagesDir', '');
+            const dataDir = _.get(config, 'dataDir', '');
             sources = [
                 { name: 'pages', path: pagesDir },
                 { name: 'data', path: dataDir }
@@ -65,8 +65,8 @@ module.exports.bootstrap = async ({ setPluginContext, options, refresh }) => {
 
             if (filePathsCopy.includes(stackbitYamlFileName)) {
                 log('reloading stackbit.yaml and models...');
-                const { models, stackbitYaml } = await loadStackbitYaml(stackbitYamlPath)
-                setPluginContext({ models, stackbitYaml });
+                const config = await loadStackbitYaml();
+                setPluginContext({ config });
             }
 
             if (_.some(filePathsCopy, filePath => filePath !== stackbitYamlFileName)) {
@@ -99,12 +99,12 @@ module.exports.bootstrap = async ({ setPluginContext, options, refresh }) => {
 module.exports.transform = ({ data, getPluginContext, options }) => {
     const context = getPluginContext();
     let objects = context.files;
-    if (context.stackbitYaml && context.models) {
-        objects = matchObjectsToModels(context.files, context.models, {
+    if (context.config) {
+        objects = matchObjectsToModels(context.files, context.config.models, {
             pageObjectsPredicate: _.matches({__metadata: {sourceName: 'pages'}}),
             dataObjectsPredicate: _.matches({__metadata: {sourceName: 'data'}}),
-            pageLayoutKey: ['frontmatter', _.get(context, 'stackbitYaml.pageLayoutKey', 'layout')],
-            dataTypeKey: _.get(context, 'stackbitYaml.objectTypeKey', 'type'),
+            pageLayoutKey: ['frontmatter', _.get(context.config, 'pageLayoutKey', 'layout')],
+            dataTypeKey: _.get(context.config, 'objectTypeKey', 'type'),
             objectIdKeyPath: '__metadata.id',
             objectFileKeyPath: '__metadata.relSourcePath',
             source: SOURCE,
@@ -117,12 +117,15 @@ module.exports.transform = ({ data, getPluginContext, options }) => {
     });
 };
 
-async function loadStackbitYaml(stackbitYamlPath) {
-    log('loading stackbit.yaml...');
-    const stackbitYaml = await parseFile(stackbitYamlPath);
-    const models = loadModels(stackbitYaml.models);
-    log(`loaded stackbit.yaml, found ${models.length} models`);
-    return { models, stackbitYaml };
+async function loadStackbitYaml() {
+    const cwd = process.cwd();
+    const { config } = await loadConfig({ dirPath: cwd });
+    if (!config) {
+        log('failed to load stackbit.yaml');
+        return null;
+    }
+    log(`loaded stackbit.yaml, found ${config.models.length} models`);
+    return config;
 }
 
 async function readFiles(sources) {
