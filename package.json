@@ -1,6 +1,6 @@
 {
   "name": "sourcebit-source-filesystem",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Sourcebit filesystem source plugin",
   "main": "src/index.js",
   "scripts": {
