@@ -3,7 +3,7 @@ const fse = require('fs-extra');
 const path = require('path');
 const _ = require('lodash');
 const { loadConfig } = require('@stackbit/sdk');
-const { parseFile, mapPromise, readDirRecursively } = require('@stackbit/utils');
+const { parseFile, mapPromise, reducePromise, readDirRecursively } = require('@stackbit/utils');
 const { matchObjectsToModels } = require('./models-matcher');
 
 
@@ -22,6 +22,10 @@ module.exports.options = {
 
 function log(message) {
     console.log(`[${SOURCE}] ${message}`);
+}
+
+function logError(message) {
+    console.error(`[${SOURCE}] ${message}`);
 }
 
 module.exports.bootstrap = async ({ setPluginContext, options, refresh }) => {
@@ -137,22 +141,27 @@ async function readFiles(sources) {
             const ext = path.extname(filePath).substring(1);
             return ['yml', 'yaml', 'json', 'toml', 'md'].includes(ext);
         }).sort();
-        return mapPromise(filePaths, async filePath => {
+        return reducePromise(filePaths, async (result, filePath) => {
             const absFilePath = path.join(absSourcePath, filePath);
-            const data = await parseFile(absFilePath);
             const relProjectPath = path.relative(absProjectPath, absFilePath);
             const relSourcePath = path.relative(absSourcePath, absFilePath);
-            return _.assign({
-                __metadata: {
-                    id: `${relProjectPath}`,
-                    source: SOURCE,
-                    sourceName: name,
-                    sourcePath: sourcePath,
-                    relSourcePath: relSourcePath,
-                    relProjectPath: relProjectPath
-                }
-            }, data);
-        });
+            try {
+                const data = await parseFile(absFilePath);
+                result.push(_.assign({
+                    __metadata: {
+                        id: `${relProjectPath}`,
+                        source: SOURCE,
+                        sourceName: name,
+                        sourcePath: sourcePath,
+                        relSourcePath: relSourcePath,
+                        relProjectPath: relProjectPath
+                    }
+                }, data));
+            } catch (error) {
+                logError(`failed to parse file: ${relProjectPath}`);
+            }
+            return result;
+        }, []);
     });
     return _.chain(result).flatten().value();
 }
