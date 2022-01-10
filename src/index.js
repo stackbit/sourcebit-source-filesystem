@@ -149,12 +149,12 @@ async function readFiles(sources) {
                 const data = await parseFile(absFilePath);
                 result.push(_.assign({
                     __metadata: {
-                        id: `${relProjectPath}`,
+                        id: `${convertPathToPosix(relProjectPath)}`,
                         source: SOURCE,
                         sourceName: name,
-                        sourcePath: sourcePath,
-                        relSourcePath: relSourcePath,
-                        relProjectPath: relProjectPath
+                        sourcePath: convertPathToPosix(sourcePath),
+                        relSourcePath: convertPathToPosix(relSourcePath),
+                        relProjectPath: convertPathToPosix(relProjectPath)
                     }
                 }, data));
             } catch (error) {
@@ -164,4 +164,14 @@ async function readFiles(sources) {
         }, []);
     });
     return _.chain(result).flatten().value();
+}
+
+function convertPathToPosix(p) {
+    if (path.sep === path.posix.sep) {
+        return p;
+    }
+    if (!p) {
+        return p;
+    }
+    return p.split(path.sep).join(path.posix.sep);
 }
